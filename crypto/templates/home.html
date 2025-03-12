@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .status { display: inline-block; padding: 5px 10px; color: #fff; margin-bottom: 10px; }
+    .ok { background: green; }
+    .error { background: red; }
+    table {
+      border-collapse: collapse;
+      width: 48%;
+      max-width: 600px;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+    th { background: #f2f2f2; }
+    .tables-container {
+      display: flex;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Курсы криптовалют</h1>
+
+  <div id="wsStatus" class="status">WebSocket: не подключен</div>
+
+  <div class="tables-container">
+    <div>
+      <h2>ETH/USDT</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Price</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody id="ethBody"></tbody>
+      </table>
+    </div>
+    <div>
+      <h2>BTC/USDT</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Price</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody id="btcBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const wsStatus = document.getElementById("wsStatus");
+      const btcBody = document.getElementById("btcBody");
+      const ethBody = document.getElementById("ethBody");
+      fetch('/api/binance/?symbol=BTCUSDT')
+        .then(res => res.json())
+        .then(data => {
+          data.forEach(item => {
+            if (item.symbol === "BTCUSDT") {
+              addRow(btcBody, item.symbol, item.price, item.timestamp);
+            }
+          });
+        })
+        .catch(err => console.error("Ошибка загрузки BTC истории:", err));
+      fetch('/api/binance/?symbol=ETHUSDT')
+        .then(res => res.json())
+        .then(data => {
+          data.forEach(item => {
+            if (item.symbol === "ETHUSDT") {
+              addRow(ethBody, item.symbol, item.price, item.timestamp);
+            }
+          });
+        })
+        .catch(err => console.error("Ошибка загрузки ETH истории:", err));
+
+      const socket = new WebSocket("ws://127.0.0.1:8000/ws/binance/");
+      socket.onopen = function() {
+        wsStatus.textContent = "WebSocket: подключен!";
+        wsStatus.classList.add("ok");
+        wsStatus.classList.remove("error");
+      };
+
+      socket.onmessage = function(event) {
+        const msg = JSON.parse(event.data);
+        const timestamp = new Date().toISOString();
+        if (msg.symbol === "BTCUSDT") {
+          addRow(btcBody, msg.symbol, msg.price, timestamp, true);
+        } else if (msg.symbol === "ETHUSDT") {
+          addRow(ethBody, msg.symbol, msg.price, timestamp, true);
+        }
+      };
+
+      socket.onerror = function(error) {
+        console.error("WebSocket error:", error);
+        wsStatus.textContent = "WebSocket: ошибка!";
+        wsStatus.classList.add("error");
+        wsStatus.classList.remove("ok");
+      };
+
+      socket.onclose = function() {
+        wsStatus.textContent = "WebSocket: закрыт!";
+        wsStatus.classList.add("error");
+        wsStatus.classList.remove("ok");
+      };
+
+      function addRow(tableBody, symbol, price, timestamp, prepend=false) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${symbol}</td>
+          <td>${price}</td>
+          <td>${timestamp}</td>
+        `;
+        if (prepend && tableBody.firstChild) {
+          tableBody.insertBefore(row, tableBody.firstChild);
+        } else {
+          tableBody.appendChild(row);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
