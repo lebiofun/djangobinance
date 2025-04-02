@@ -1,50 +1,60 @@
-import json
 import threading
+import json
+import logging
+import time
 from django.core.management.base import BaseCommand
 from websocket import WebSocketApp
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from crypto.models import PriceUpdate
 
+logger = logging.getLogger("binance_logger")
+
 BINANCE_WS_URL = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade"
 
-
 def on_message(ws, message):
-    import json
-    data = json.loads(message)
+    try:
+        data = json.loads(message)
+        stream = data.get("stream")
+        inner_data = data.get("data", {})
 
-    # Для мультистрима Binance приходит {"stream": "btcusdt@trade", "data": {...}}
-    stream = data.get("stream")       # "btcusdt@trade" или "ethusdt@trade"
-    inner_data = data.get("data", {}) # внутри "data" уже лежит сделка
+        symbol = inner_data.get("s")
+        price = inner_data.get("p")
 
-    symbol = inner_data.get("s")  # "BTCUSDT" или "ETHUSDT"
-    price = inner_data.get("p")
-    # Сохраняем в БД
-    PriceUpdate.objects.create(symbol=symbol, price=price)
-    # Рассылаем в группу
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "prices",
-        {
-            "type": "send_price_update",
-            "data": {"symbol": symbol, "price": price},
-        }
-    )
+        if symbol and price:
+            logger.info(f"Стрим: {stream} | Получены данные: {symbol} - {price}")
 
+            PriceUpdate.objects.create(symbol=symbol, price=price)
+
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "prices",
+                {
+                    "type": "send_price_update",
+                    "data": {"symbol": symbol, "price": price},
+                }
+            )
+        else:
+            logger.warning(f"Стрим: {stream} | Некорректный ответ от Binance: {data}")
+
+    except Exception as e:
+        logger.error(f"Ошибка обработки сообщения: {e}", exc_info=True)
 
 def on_error(ws, error):
-    print("WebSocket error:", error)
+    logger.error(f"WebSocket ошибка: {error}", exc_info=True)
 
 def on_close(ws, close_status_code, close_msg):
-    print("WebSocket closed")
+    logger.warning(f"WebSocket закрыт. Код: {close_status_code}, Причина: {close_msg}")
 
 def on_open(ws):
-    print("WebSocket connection opened")
+    logger.info("WebSocket соединение открыто.")
 
 class Command(BaseCommand):
     help = "Starts Binance WebSocket client."
 
     def handle(self, *args, **options):
+        logger.info("Запуск Binance WebSocket клиента...")
+
         ws = WebSocketApp(
             BINANCE_WS_URL,
             on_open=on_open,
@@ -52,15 +62,16 @@ class Command(BaseCommand):
             on_error=on_error,
             on_close=on_close
         )
-        wst = threading.Thread(target=ws.run_forever)
-        wst.daemon = True
+
+        wst = threading.Thread(target=ws.run_forever, daemon=True)
         wst.start()
 
-        self.stdout.write(self.style.SUCCESS("Binance WebSocket client started. Press Ctrl+C to stop."))
+        self.stdout.write(self.style.SUCCESS("Binance WebSocket клиент запущен. Нажмите Ctrl+C для остановки."))
 
         try:
             while True:
-                pass
+                time.sleep(1)
         except KeyboardInterrupt:
+            logger.warning("Остановка WebSocket клиента...")
             ws.close()
-            self.stdout.write(self.style.WARNING("Binance WebSocket client stopped."))
+            self.stdout.write(self.style.WARNING("Binance WebSocket клиент остановлен."))

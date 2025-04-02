@@ -3,24 +3,51 @@
 <head>
   <meta charset="utf-8"/>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .status { display: inline-block; padding: 5px 10px; color: #fff; margin-bottom: 10px; }
-    .ok { background: green; }
-    .error { background: red; }
-    table {
-      border-collapse: collapse;
-      width: 48%;
-      max-width: 600px;
-      margin-bottom: 20px;
+      body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #121212;
+      color: white;
+      text-align: center;
     }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
+    .status {
+      display: inline-block;
+      padding: 10px 15px;
+      color: #fff;
+      border-radius: 5px;
+      font-weight: bold;
     }
-    th { background: #f2f2f2; }
+    .ok { background: #28a745; }
+    .error { background: #dc3545; }
     .tables-container {
       display: flex;
-      gap: 10px;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .crypto-table {
+      width: 45%;
+      max-width: 500px;
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #333;
+    }
+    th {
+      background: #333;
+    }
+    tr:nth-child(odd) { background: #252525; }
+    tr.highlight {
+      background-color: #007bff !important;
+      transition: background-color 0.5s;
     }
   </style>
 </head>
